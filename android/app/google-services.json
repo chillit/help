@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "79609830834",
+    "project_id": "authelp-59c85",
+    "storage_bucket": "authelp-59c85.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:79609830834:android:4284acb42e57d6c69a18ab",
+        "android_client_info": {
+          "package_name": "com.example.authelp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAuUhBx6H247NZJ2sa9Klc_vS70ynZzjfM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:79609830834:android:72632c6f2bdd836d9a18ab",
+        "android_client_info": {
+          "package_name": "com.example.help"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAuUhBx6H247NZJ2sa9Klc_vS70ynZzjfM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
