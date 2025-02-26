@@ -31,9 +31,9 @@ class CharityRunsPage extends StatelessWidget {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Participants'),
+          title: Text('Participants',style: TextStyle(fontFamily: "Helvetica"),),
           content: participants.isEmpty
-              ? Text('No participants found.')
+              ? Text('No participants found.',style: TextStyle(fontFamily: "Helvetica"),)
               : SizedBox(
             width: 450,
             child: ListView.builder(
@@ -58,7 +58,7 @@ class CharityRunsPage extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Close'),
+              child: Text('Close',style: TextStyle(fontFamily: "Helvetica"),),
             ),
           ],
         );
@@ -71,7 +71,7 @@ class CharityRunsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Charity Run', style: TextStyle(color: Colors.white),),
+        title: Text('Charity Run', style: TextStyle(color: Colors.white,fontFamily: "Helvetica"),),
         backgroundColor: Color(0xFF072c2d),
         actions: [
           Row(
@@ -83,7 +83,7 @@ class CharityRunsPage extends StatelessWidget {
                     MaterialPageRoute(builder: (context) => MarathonPrizePage()),
                   );
                 },
-                child: Text('CHARITY', style: TextStyle(color: Colors.white)),
+                child: Text('CHARITY', style: TextStyle(color: Colors.white,fontFamily: "Helvetica")),
               ),
               SizedBox(width: 10,),
               TextButton(
@@ -129,22 +129,22 @@ class CharityRunsPage extends StatelessWidget {
                         padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         color: Colors.white,
                         child: Text('RUN FOR CHARITY',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green[900])),
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green[900], fontFamily: "Helvetica")),
                       ),
                       SizedBox(height: 10),
                       Text(
                         'NIS 10-Year Charity Marathon',
                         style: TextStyle(
                           fontSize: 48, // Adjusted for better fit
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,fontFamily: "Helvetica"
                         ),
                       ),
                       Text(
                         'Celebrating 10 years of NIS in Petropavlovsk, Kazakhstan - 2025',
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.white,
+                          color: Colors.white, fontFamily: "Helvetica"
                         ),
                       ),
                     ],
@@ -168,17 +168,17 @@ class CharityRunsPage extends StatelessWidget {
                       children: [
                         Text(
                           'CHARITY RUNS IN PETROPAVLOVSK',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: "Helvetica"),
                         ),
                         SizedBox(height: 10),
                         Text(
                           'Join us in celebrating 10 years of NIS! Run for charity and support education in Petropavlovsk, Kazakhstan.',
-                          style: TextStyle(fontSize: 16, color: Colors.white),
+                          style: TextStyle(fontSize: 16, color: Colors.white, fontFamily: "Helvetica"),
                         ),
                         SizedBox(height: 20),
                         Text(
                           'EVENT CATEGORIES',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: "Helvetica"),
                         ),
                         Wrap(
                           spacing: 10,
@@ -192,7 +192,7 @@ class CharityRunsPage extends StatelessWidget {
                         SizedBox(height: 20),
                         Text(
                           'EVENT LOCATIONS',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: "Helvetica"),
                         ),
                         Wrap(
                           spacing: 8,
@@ -214,7 +214,7 @@ class CharityRunsPage extends StatelessWidget {
                                 );
                               },
                               style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                              child: Text('MAP VIEW', style: TextStyle(color: Colors.white),),
+                              child: Text('MAP VIEW', style: TextStyle(color: Colors.white, fontFamily: "Helvetica"),),
                             ),
                             SizedBox(width: 10),
                             ElevatedButton(
@@ -233,7 +233,7 @@ class CharityRunsPage extends StatelessWidget {
                                 }
                               },
                               style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                              child: Text('REGISTER NOW',style: TextStyle(color: Colors.white),),
+                              child: Text('REGISTER NOW',style: TextStyle(color: Colors.white, fontFamily: "Helvetica"),),
                             ),
                             SizedBox(width: 10),
                             ElevatedButton(
@@ -241,7 +241,7 @@ class CharityRunsPage extends StatelessWidget {
                                 _showParticipantsDialog(context);
                               },
                               style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                              child: Text('PARTICIPANTS',style: TextStyle(color: Colors.white),),
+                              child: Text('PARTICIPANTS',style: TextStyle(color: Colors.white, fontFamily: "Helvetica"),),
                             ),
                             SizedBox(width: 10),
                           ],
@@ -260,14 +260,14 @@ class CharityRunsPage extends StatelessWidget {
 
   Widget _buildCategoryChip(String label) {
     return Chip(
-      label: Text(label, style: TextStyle(color: Colors.white)),
+      label: Text(label, style: TextStyle(color: Colors.white, fontFamily: "Helvetica")),
       backgroundColor: Colors.blue,
     );
   }
 
   Widget _buildLocationChip(String label) {
     return Chip(
-      label: Text(label, style: TextStyle(color: Colors.white)),
+      label: Text(label, style: TextStyle(color: Colors.white, fontFamily: "Helvetica")),
       backgroundColor: Colors.green,
     );
   }

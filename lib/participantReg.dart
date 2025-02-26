@@ -1,12 +1,14 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-
+import 'package:pdf/widgets.dart' as pw;
 import 'info.dart';
+import 'package:universal_html/html.dart' as html;
 
 class RegistrationPage extends StatefulWidget {
   @override
@@ -18,18 +20,25 @@ class _RegistrationPageState extends State<RegistrationPage> {
   TextEditingController cardNumberController = TextEditingController();
   TextEditingController expiryDateController = TextEditingController();
   TextEditingController cvvController = TextEditingController();
-  Future<String> sendMessage(String date, String gender, String description, String type) async {
+
+  Future<String> sendMessage(
+      String date, String gender, String description, String type) async {
     try {
       final response = await http.post(
         Uri.parse('https://api.openai.com/v1/chat/completions'),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer sk-2ruHUfuexrGGvI3JkS6GBXpPQacBoG7CjgINSwuUZVT3BlbkFJBl8zXKJcR-TTVQg72cf3UNDg_E_YwZLgqefgJfr1UA',
+          'Authorization':
+          'Bearer sk-2ruHUfuexrGGvI3JkS6GBXpPQacBoG7CjgINSwuUZVT3BlbkFJBl8zXKJcR-TTVQg72cf3UNDg_E_YwZLgqefgJfr1UA',
         },
         body: json.encode({
           'model': 'gpt-4o',
           'messages': [
-            {'role': 'system', 'content': 'Hello, you are an assistant for a charity marathon NIS 2025. I will provide you with information about a participant. Can you give them some advice in plain text with a numbered order? Date of birth: $date, Gender: $gender, Description: $description, and they participate in $type marathon. You can also say that participant should not praticipate.Write in brackets "Weather in daytime is -7". Also do not use extra signs and emojis and bold text`'},
+            {
+              'role': 'system',
+              'content':
+              'Hello, you are an assistant for a charity marathon NIS 2025. I will provide you with information about a participant. Can you give them some advice in plain text with a numbered order? Date of birth: $date, Gender: $gender, Description: $description, and they participate in $type marathon. You can also say that participant should not praticipate.Write in brackets "Weather in daytime is -7". Also do not use extra signs and emojis and bold text'
+            },
           ],
         }),
       );
@@ -44,6 +53,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       return 'Error fetching advice';
     }
   }
+
   void _showPaymentSheet() {
     showModalBottomSheet(
       context: context,
@@ -59,24 +69,37 @@ class _RegistrationPageState extends State<RegistrationPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Payment Method(5000₸)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text(
+                    'Payment Method(5000₸)',
+                    style: TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                   SizedBox(height: 10),
                   Wrap(
                     spacing: 10,
                     runSpacing: 10,
                     children: [
-                      _buildPaymentButton('Halyk', Icons.account_balance_wallet, setStateSheet, Colors.green),
-                      _buildPaymentButton('Kaspi', Icons.credit_card, setStateSheet, Colors.red),
-                      _buildPaymentButton('ApplePay', Icons.apple, setStateSheet, Colors.black),
-                      _buildPaymentButton('GooglePay', Icons.android, setStateSheet, Colors.green),
-                      _buildPaymentButton('SberBank', Icons.account_balance, setStateSheet, Colors.green),
-                      _buildPaymentButton('Jusan', Icons.payment, setStateSheet, Colors.orange),
-                      _buildPaymentButton('PayPal', Icons.paypal, setStateSheet, Colors.black),
-                      _buildPaymentButton('Visa/MasterCard', Icons.credit_card, setStateSheet, Colors.red),
+                      _buildPaymentButton(
+                          'Halyk', Icons.account_balance_wallet, setStateSheet, Colors.green),
+                      _buildPaymentButton(
+                          'Kaspi', Icons.credit_card, setStateSheet, Colors.red),
+                      _buildPaymentButton(
+                          'ApplePay', Icons.apple, setStateSheet, Colors.black),
+                      _buildPaymentButton(
+                          'GooglePay', Icons.android, setStateSheet, Colors.green),
+                      _buildPaymentButton(
+                          'SberBank', Icons.account_balance, setStateSheet, Colors.green),
+                      _buildPaymentButton(
+                          'Jusan', Icons.payment, setStateSheet, Colors.orange),
+                      _buildPaymentButton(
+                          'PayPal', Icons.paypal, setStateSheet, Colors.black),
+                      _buildPaymentButton(
+                          'Visa/MasterCard', Icons.credit_card, setStateSheet, Colors.red),
                     ],
                   ),
                   SizedBox(height: 10),
-                  if (selectedPaymentMethod == 'Visa/MasterCard') _buildCardPaymentFields(),
+                  if (selectedPaymentMethod == 'Visa/MasterCard')
+                    _buildCardPaymentFields(),
                   SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () {
@@ -138,9 +161,13 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
-                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding:
+                      EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     ),
-                    child: Text('Donate Now', style: TextStyle(color: Colors.white)),
+                    child: Text(
+                      'Donate Now',
+                      style: TextStyle(color: Colors.white, fontSize: 18),
+                    ),
                   ),
                 ],
               ),
@@ -151,7 +178,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
     );
   }
 
-  Widget _buildPaymentButton(String label, IconData icon, StateSetter setStateSheet, Color clr) {
+  Widget _buildPaymentButton(
+      String label, IconData icon, StateSetter setStateSheet, Color clr) {
     return ElevatedButton.icon(
       onPressed: () {
         setStateSheet(() {
@@ -162,8 +190,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
         backgroundColor: selectedPaymentMethod == label ? Colors.blue : clr,
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       ),
-      icon: Icon(icon, color: Colors.white),
-      label: Text(label, style: TextStyle(color: Colors.white)),
+      icon: Icon(icon, color: Colors.white, size: 18),
+      label: Text(
+        label,
+        style: TextStyle(color: Colors.white, fontSize: 18),
+      ),
     );
   }
 
@@ -175,9 +206,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
             labelText: 'Card Number',
-            prefixIcon: Icon(Icons.credit_card),
+            labelStyle: TextStyle(fontSize: 18),
+            prefixIcon: Icon(Icons.credit_card, size: 18),
             border: OutlineInputBorder(),
           ),
+          style: TextStyle(fontSize: 18),
         ),
         SizedBox(height: 10),
         Row(
@@ -188,9 +221,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 keyboardType: TextInputType.datetime,
                 decoration: InputDecoration(
                   labelText: 'Expiry Date (MM/YY)',
-                  prefixIcon: Icon(Icons.date_range),
+                  labelStyle: TextStyle(fontSize: 18),
+                  prefixIcon: Icon(Icons.date_range, size: 18),
                   border: OutlineInputBorder(),
                 ),
+                style: TextStyle(fontSize: 18),
               ),
             ),
             SizedBox(width: 10),
@@ -201,9 +236,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 obscureText: true,
                 decoration: InputDecoration(
                   labelText: 'CVV',
-                  prefixIcon: Icon(Icons.lock),
+                  labelStyle: TextStyle(fontSize: 18),
+                  prefixIcon: Icon(Icons.lock, size: 18),
                   border: OutlineInputBorder(),
                 ),
+                style: TextStyle(fontSize: 18),
               ),
             ),
           ],
@@ -218,7 +255,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
       dialogType: DialogType.success,
       animType: AnimType.topSlide,
       title: 'Donation Successful 🎉',
-      desc: 'Thank you for your contribution of \$${amount.toStringAsFixed(2)}! Your donation via $selectedPaymentMethod has been received.',
+      desc:
+      'Thank you for your contribution of \$${amount.toStringAsFixed(2)}! Your donation via $selectedPaymentMethod has been received.',
+      titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      descTextStyle: TextStyle(fontSize: 18),
       btnOkOnPress: () async {
         User? currentUser = FirebaseAuth.instance.currentUser;
         if (currentUser == null) {
@@ -228,6 +268,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
             title: 'User not logged in',
             desc: 'Please log in first.',
             btnOkOnPress: () {},
+            titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            descTextStyle: TextStyle(fontSize: 18),
           ).show();
           return;
         }
@@ -260,7 +302,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
         }
 
         // Save participant data to 'participants' node
-        DatabaseReference participantsRef = FirebaseDatabase.instance.ref('participants/$userId');
+        DatabaseReference participantsRef =
+        FirebaseDatabase.instance.ref('participants/$userId');
         await participantsRef.set({
           'name': _nameController.text,
           'phone': _phoneController.text,
@@ -277,7 +320,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
         );
       },
     ).show();
+    _generateAndDownloadReceipt(5000);
   }
+
   final _formKey = GlobalKey<FormState>();
   DateTime? _selectedDate;
   String? _selectedGender;
@@ -302,10 +347,64 @@ class _RegistrationPageState extends State<RegistrationPage> {
     }
   }
 
+  Future<void> _generateAndDownloadReceipt(double amount) async {
+    final pdf = pw.Document();
+    final now = DateTime.now();
+
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Center(
+            child: pw.Column(
+              mainAxisAlignment: pw.MainAxisAlignment.center,
+              children: [
+                pw.Text('Donation Receipt',
+                    style: pw.TextStyle(
+                        fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 20),
+                pw.Text('Date: ${now.toLocal()}',
+                    style: pw.TextStyle(fontSize: 18)),
+                pw.Text('Amount Donated: \₸${amount.toStringAsFixed(2)}',
+                    style: pw.TextStyle(fontSize: 18)),
+                pw.Text('Payment Method: $selectedPaymentMethod',
+                    style: pw.TextStyle(fontSize: 18)),
+                pw.SizedBox(height: 20),
+                pw.Text('Thank you for your generous contribution!',
+                    textAlign: pw.TextAlign.center,
+                    style: pw.TextStyle(fontSize: 18)),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    try {
+      final Uint8List pdfBytes = await pdf.save();
+
+      // Create a downloadable file in the browser
+      final blob = html.Blob([pdfBytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute("download", "receipt.pdf")
+        ..click();
+      html.Url.revokeObjectUrl(url);
+
+      print("Receipt downloaded successfully!");
+    } catch (e) {
+      print("Failed to generate receipt: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Registration for NIS 2025 Marathon")),
+      appBar: AppBar(
+        title: const Text(
+          "Registration for NIS 2025 Marathon",
+          style: TextStyle(fontSize: 18),
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Row(
@@ -318,87 +417,148 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Name *', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Name *',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
                       TextFormField(
                         controller: _nameController,
-                        validator: (value) => value?.isEmpty ?? true ? 'Required field' : null,
+                        style: TextStyle(fontSize: 18),
+                        validator: (value) =>
+                        value?.isEmpty ?? true ? 'Required field' : null,
                       ),
                       const SizedBox(height: 20),
-                      const Text('Mobile Phone *', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Mobile Phone *',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontFamily: "Helvetica",
+                            fontSize: 18),
+                      ),
                       TextFormField(
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
+                        style: TextStyle(fontSize: 18),
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        validator: (value) => value?.isEmpty ?? true ? 'Required field' : null,
+                        validator: (value) =>
+                        value?.isEmpty ?? true ? 'Required field' : null,
                       ),
                       const SizedBox(height: 20),
-                      const Text('Marathon Type *', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Marathon Type *',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontFamily: "Helvetica",
+                            fontSize: 18),
+                      ),
                       Row(
                         children: [
                           Radio<String>(
                             value: '5k',
                             groupValue: _selectedGender,
-                            onChanged: (value) => setState(() => _selectedGender = value),
+                            onChanged: (value) =>
+                                setState(() => _selectedGender = value),
                           ),
-                          const Text('5K Marathon'),
+                          const Text(
+                            '5K Marathon',
+                            style: TextStyle(
+                                fontFamily: "Helvetica", fontSize: 18),
+                          ),
                           const SizedBox(width: 20),
                           Radio<String>(
                             value: '10K',
                             groupValue: _selectedType,
-                            onChanged: (value) => setState(() => _selectedType = value),
+                            onChanged: (value) =>
+                                setState(() => _selectedType = value),
                           ),
-                          const Text('10K Marathon'),
+                          const Text(
+                            '10K Marathon',
+                            style: TextStyle(
+                                fontFamily: "Helvetica", fontSize: 18),
+                          ),
                           const SizedBox(width: 20),
                           Radio<String>(
                             value: 'Half',
                             groupValue: _selectedType,
-                            onChanged: (value) => setState(() => _selectedType = value),
+                            onChanged: (value) =>
+                                setState(() => _selectedType = value),
                           ),
-                          const Text('Half Marathon'),
+                          const Text(
+                            'Half Marathon',
+                            style: TextStyle(
+                                fontFamily: "Helvetica", fontSize: 18),
+                          ),
                           const SizedBox(width: 20),
                           Radio<String>(
                             value: 'Full',
                             groupValue: _selectedType,
-                            onChanged: (value) => setState(() => _selectedType = value),
+                            onChanged: (value) =>
+                                setState(() => _selectedType = value),
                           ),
-                          const Text('Full Marathon'),
+                          const Text(
+                            'Full Marathon',
+                            style: TextStyle(
+                                fontFamily: "Helvetica", fontSize: 18),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 20),
-                      const Text('Date of Birth *', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Date of Birth *',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
                       InkWell(
                         onTap: () => _selectDate(context),
                         child: IgnorePointer(
                           child: TextFormField(
                             controller: _dateController,
-                            decoration: const InputDecoration(hintText: 'dd/mm/yyyy'),
-                            validator: (value) => value?.isEmpty ?? true ? 'Required field' : null,
+                            decoration:
+                            const InputDecoration(hintText: 'dd/mm/yyyy'),
+                            style: TextStyle(fontSize: 18),
+                            validator: (value) =>
+                            value?.isEmpty ?? true ? 'Required field' : null,
                           ),
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const Text('Gender *', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Gender *',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
                       Row(
                         children: [
                           Radio<String>(
                             value: 'Male',
                             groupValue: _selectedGender,
-                            onChanged: (value) => setState(() => _selectedGender = value),
+                            onChanged: (value) =>
+                                setState(() => _selectedGender = value),
                           ),
-                          const Text('Male'),
+                          const Text(
+                            'Male',
+                            style: TextStyle(fontSize: 18),
+                          ),
                           const SizedBox(width: 20),
                           Radio<String>(
                             value: 'Female',
                             groupValue: _selectedGender,
-                            onChanged: (value) => setState(() => _selectedGender = value),
+                            onChanged: (value) =>
+                                setState(() => _selectedGender = value),
                           ),
-                          const Text('Female'),
+                          const Text(
+                            'Female',
+                            style: TextStyle(fontSize: 18),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 20),
-                      const Text('Description *', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Description *',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
                       TextFormField(
                         controller: _descriptionController,
+                        style: TextStyle(fontSize: 18),
                       ),
                       const SizedBox(height: 20),
                       ElevatedButton(
@@ -413,19 +573,31 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             showDialog(
                               context: context,
                               builder: (context) => AlertDialog(
-                                title: const Text('Advice from ChatGPT'),
-                                content: Text(advice),
+                                title: const Text(
+                                  'Advices',
+                                  style: TextStyle(fontSize: 18),
+                                ),
+                                content: Text(
+                                  advice,
+                                  style: TextStyle(fontSize: 18),
+                                ),
                                 actions: [
                                   TextButton(
                                     onPressed: () => Navigator.pop(context),
-                                    child: const Text('OK'),
+                                    child: const Text(
+                                      'OK',
+                                      style: TextStyle(fontSize: 18),
+                                    ),
                                   ),
                                 ],
                               ),
                             );
                           }
                         },
-                        child: const Text('Get Advice'),
+                        child: const Text(
+                          'Get Advice',
+                          style: TextStyle(fontSize: 18),
+                        ),
                       ),
                     ],
                   ),
@@ -452,34 +624,74 @@ class _RegistrationPageState extends State<RegistrationPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(height: 40,),
-            const Text(
-              "1 Feburary",
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+            const SizedBox(
+              height: 40,
             ),
-            SizedBox(height: 12,),
+            const Text(
+              "1 February",
+              style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18),
+            ),
+            const SizedBox(
+              height: 12,
+            ),
             const Text(
               "NIS MARATHON CUP 2025",
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 32),
+              style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18),
             ),
-            SizedBox(height: 12,),
+            const SizedBox(
+              height: 12,
+            ),
             const Divider(color: Colors.white),
-            SizedBox(height: 12,),
-            const Text("Стартовый взнос: 5000₸", style: TextStyle(color: Colors.white, fontSize: 16)),
-            SizedBox(height: 12,),
-            const Text("Скидка по промокоду: 5000₸", style: TextStyle(color: Colors.white, fontSize: 16)),
-            SizedBox(height: 12,),
-            const Text("Благотворительный взнос: 5000₸", style: TextStyle(color: Colors.white, fontSize: 16)),
-            SizedBox(height: 12,),
+            const SizedBox(
+              height: 12,
+            ),
+            const Text(
+              "Стартовый взнос: 5000₸",
+              style: TextStyle(color: Colors.white, fontSize: 18),
+            ),
+            const SizedBox(
+              height: 12,
+            ),
+            const Text(
+              "Скидка по промокоду: 5000₸",
+              style: TextStyle(color: Colors.white, fontSize: 18),
+            ),
+            const SizedBox(
+              height: 12,
+            ),
+            const Text(
+              "Благотворительный взнос: 5000₸",
+              style: TextStyle(color: Colors.white, fontSize: 18),
+            ),
+            const SizedBox(
+              height: 12,
+            ),
             const Divider(color: Colors.white),
-            SizedBox(height: 12,),
-            const Text("Общая сумма: 5000₸", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 22),
+            const SizedBox(
+              height: 12,
+            ),
+            const Text(
+              "Общая сумма: 5000₸",
+              style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18),
+            ),
+            const SizedBox(
+              height: 22,
+            ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: Colors.blue,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
               ),
               onPressed: () {
                 bool isFormValid = _formKey.currentState?.validate() ?? false;
@@ -488,20 +700,28 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   _showPaymentSheet();
                 } else {
                   String errorMessage = '';
-                  if (!isFormValid) errorMessage += 'Please fill in all required fields.\n';
-                  if (!isGenderSelected) errorMessage += 'Please select your gender.\n';
+                  if (!isFormValid)
+                    errorMessage += 'Please fill in all required fields.\n';
+                  if (!isGenderSelected)
+                    errorMessage += 'Please select your gender.\n';
                   AwesomeDialog(
                     context: context,
                     dialogType: DialogType.error,
                     title: 'Form Incomplete',
                     desc: errorMessage,
                     btnOkOnPress: () {},
+                    titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    descTextStyle: TextStyle(fontSize: 18),
                   ).show();
                 }
               },
-              child: const Center(child: Text("Перейти к оплате")),
+              child: const Center(
+                child: Text(
+                  "Перейти к оплате",
+                  style: TextStyle(fontSize: 18),
+                ),
+              ),
             ),
-
           ],
         ),
       ),

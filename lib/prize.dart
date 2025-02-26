@@ -3,9 +3,18 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:help/ranking.dart';
-
+import 'dart:io';
+import 'package:flutter_email_sender/flutter_email_sender.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
+import 'dart:html' as html;
+import 'dart:typed_data';
+import 'package:pdf/widgets.dart' as pw;
 import 'login.dart';
-
+import 'package:flutter/foundation.dart'; // For kIsWeb
+import 'package:universal_html/html.dart' as html; // Web-specific operations
+import 'package:intl/intl.dart';
 class MarathonPrizePage extends StatefulWidget {
   @override
   _MarathonPrizePageState createState() => _MarathonPrizePageState();
@@ -31,9 +40,9 @@ class _MarathonPrizePageState extends State<MarathonPrizePage> {
     DatabaseReference prizeFundRef = FirebaseDatabase.instance.ref('money');
     DataSnapshot snapshot = await prizeFundRef.get();
 
-    if (snapshot.exists && snapshot.value is double) {
+    if (snapshot.exists && snapshot.value is num) {
       setState(() {
-        prizeFund = snapshot.value as int;  // Update the prize fund value
+        prizeFund = (snapshot.value as num).toInt();
       });
     } else {
       print("No prize fund found or invalid data");
@@ -225,10 +234,8 @@ class _MarathonPrizePageState extends State<MarathonPrizePage> {
       title: 'Donation Successful 🎉',
       desc: 'Thank you for your contribution of \$${amount.toStringAsFixed(2)}! Your donation via $selectedPaymentMethod has been received.',
       btnOkOnPress: () async {
-        // Get the current authenticated user's UID
         User? currentUser = FirebaseAuth.instance.currentUser;
         if (currentUser == null) {
-          // Handle case when the user is not logged in
           AwesomeDialog(
             context: context,
             dialogType: DialogType.error,
@@ -239,45 +246,116 @@ class _MarathonPrizePageState extends State<MarathonPrizePage> {
           return;
         }
 
-        String userId = currentUser.uid;  // Get the UID of the current user
+        String userId = currentUser.uid;
+        String userEmail = currentUser.email ?? 'No email found';
 
-        // Update points in the Firebase Realtime Database
-        DatabaseReference refe = FirebaseDatabase.instance.ref();
         DatabaseReference userRef = FirebaseDatabase.instance.ref('users/$userId');
-        DatabaseReference moneyref = FirebaseDatabase.instance.ref('money');
-        DataSnapshot monSnapshot = await moneyref.get();
-        if(monSnapshot.exists){
-          int moneyData = monSnapshot.value as int;
-          int currentPoints = moneyData as int ?? 0;
-          double update = currentPoints + amount;
-          await refe.update({"money": update});
+        DatabaseReference moneyRef = FirebaseDatabase.instance.ref('money');
+
+        // Update money in the prize fund
+        DataSnapshot monSnapshot = await moneyRef.get();
+        if (monSnapshot.exists && monSnapshot.value is num) {
+          num moneyData = monSnapshot.value as num;
+          double updatedMoney = moneyData + amount;
+          await moneyRef.set(updatedMoney);
         }
 
-        // Read the current points of the user
-        DataSnapshot snapshot = await userRef.get();
-        print(userId);
-
-        if (snapshot.exists && snapshot.value is Map) {
-          // Safely cast snapshot.value to a Map
-          Map<dynamic, dynamic> userData = snapshot.value as Map<dynamic, dynamic>;
-
-          // Get the current points value, defaulting to 0 if not present
+        // Update user's points
+        DataSnapshot userSnapshot = await userRef.get();
+        if (userSnapshot.exists && userSnapshot.value is Map) {
+          Map<dynamic, dynamic> userData = userSnapshot.value as Map;
           double currentPoints = userData['points'] ?? 0;
           double updatedPoints = currentPoints + amount;
-
-          // Update the points in the database
           await userRef.update({'points': updatedPoints});
-
-          // Optionally, you could show a confirmation message here if needed
-          print("User's points updated to $updatedPoints");
         } else {
-          // If user data does not exist or is not a Map, create the user with initial points
           await userRef.set({'points': amount});
-          print("User data was created with points: $amount");
         }
-      },
+
+        // Generate and send PDF receipt
+        print(userEmail);
+          await _generateAndDownloadReceipt(amount);
+        },
     ).show();
   }
+  Future<void> _generateAndDownloadReceipt(double amount) async {
+    final pdf = pw.Document();
+    final now = DateTime.now();
+
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Center(
+            child: pw.Column(
+              mainAxisAlignment: pw.MainAxisAlignment.center,
+              children: [
+                pw.Text('Donation Receipt', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 20),
+                pw.Text('Date: ${now.toLocal()}'),
+                pw.Text('Amount Donated: \$${amount.toStringAsFixed(2)}'),
+                pw.Text('Payment Method: $selectedPaymentMethod'),
+                pw.SizedBox(height: 20),
+                pw.Text('Thank you for your generous contribution!', textAlign: pw.TextAlign.center),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    try {
+      final Uint8List pdfBytes = await pdf.save();
+
+      // 📌 Create a downloadable file in the browser
+      final blob = html.Blob([pdfBytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute("download", "receipt.pdf")
+        ..click();
+      html.Url.revokeObjectUrl(url);
+
+      print("Receipt downloaded successfully!");
+    } catch (e) {
+      print("Failed to generate receipt: $e");
+    }
+  }
+
+
+  Future<void> _sendTextReceipt(String email, double amount, String selectedPaymentMethod) async {
+    final now = DateTime.now();
+    final formattedDate = DateFormat('yyyy-MM-dd HH:mm').format(now);
+
+    final String emailBody = '''
+Dear Donor,
+
+Thank you for your generous contribution!
+
+Donation Receipt:
+- Date: $formattedDate
+- Amount Donated: \$${amount.toStringAsFixed(2)}
+- Payment Method: $selectedPaymentMethod
+
+Your support is greatly appreciated!
+
+Best regards,
+[Your Organization Name]
+''';
+
+    final Email receiptEmail = Email(
+      body: emailBody,
+      subject: 'Donation Receipt',
+      recipients: [email],
+      isHTML: false,
+    );
+
+    try {
+      await FlutterEmailSender.send(receiptEmail);
+      print("Receipt sent to $email");
+    } catch (e) {
+      print("Failed to send receipt: $e");
+    }
+  }
+
+
 
 
 
