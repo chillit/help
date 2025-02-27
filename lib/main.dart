@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:help/registration.dart';
 
 import 'info.dart';
+import 'list.dart';
 import 'login.dart';
 import 'chat/chat.dart';
 import 'firebase_options.dart';
@@ -42,7 +43,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: CharityRunsPage(),
+      home: HouseListScreen(),
     );
   }
 }
