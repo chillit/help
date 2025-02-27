@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:help/check_bottom_sheet.dart';
 import 'package:help/registration.dart';
 
 import 'info.dart';
@@ -13,7 +14,7 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(MyApp());
+  runApp(FireCheckApp());
 }
 
 class MyApp extends StatelessWidget {
