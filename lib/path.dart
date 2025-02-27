@@ -9,6 +9,7 @@ import 'dart:html' as html; // Web-specific import for file handling
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:help/login_fireinspection.dart';
 import 'package:image_picker_web/image_picker_web.dart'; // Web-specific image picker
 import 'package:http/http.dart' as http;
 
@@ -559,6 +560,24 @@ class _MapScreenState extends State<MapScreen> {
   }
 
 
+  Future<void> signOut(BuildContext context) async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Вы успешно вышли из аккаунта')),
+      );
+      // Перенаправление на страницу входа (замени 'LoginPage()' на свою страницу)
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => LoginFire()),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка при выходе: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -597,7 +616,16 @@ class _MapScreenState extends State<MapScreen> {
             },
             child: Text("Add mark"),
           ),
-          SizedBox(width: 10),
+          SizedBox(width: 10,),
+          TextButton(
+            style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.black
+            ),
+            onPressed: () => signOut(context),
+            child: Text("Log Out"),
+          ),
+          SizedBox(width: 10,),
         ],
       ),
       drawer: Drawer(

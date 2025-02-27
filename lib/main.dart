@@ -1,9 +1,11 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:help/admin_panel.dart';
 import 'package:help/check_bottom_sheet.dart';
+import 'package:help/login_fireinspection.dart';
 import 'package:help/path.dart';
 import 'package:help/registration.dart';
-
+import 'package:help/role_redirector.dart';
 import 'info.dart';
 import 'list.dart';
 import 'login.dart';
@@ -22,6 +24,7 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
   @override
   Widget build(BuildContext context) {
+    print("ffffffffffffffffffffffffffffffqqqqqqqq");
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Flutter Demo',

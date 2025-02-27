@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:help/excel_exporter.dart';
 
 class House {
   final String id; // Уникальный идентификатор дома
@@ -115,6 +116,11 @@ class _HouseListScreenState extends State<HouseListScreen> {
               "Map view",
               style: TextStyle(fontSize: 16),
             ),
+          ),
+          SizedBox(width: 10),
+          IconButton(
+          icon: Icon(Icons.file_download, color: Colors.white,),
+          onPressed: () => ExcelExporter.exportToExcel(houses, context),
           ),
           SizedBox(width: 10),
         ],
