@@ -1,6 +1,10 @@
 import 'dart:typed_data';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -14,75 +18,20 @@ class _MapScreenState extends State<MapScreen> {
     target: LatLng(37.7739872, -122.431297),
     zoom: 11.5,
   );
-  late GoogleMapController _googleMapController;
-  Map<MarkerId, Marker> _markers = {};
-  Set<Polyline> _polylines = {};
 
-  final List<LatLng> marathonRoute = [
-    const LatLng(37.773972, -122.431297),
-    const LatLng(37.774900, -122.419415),
-    const LatLng(37.781500, -122.410050),
-    const LatLng(37.793200, -122.397800),
-    const LatLng(37.802900, -122.405700),
-    const LatLng(37.808000, -122.417900),
-    const LatLng(37.801400, -122.433700),
-  ];
+  late GoogleMapController _googleMapController;
+  LatLng? _selectedLocation;
+  Marker? _selectedMarker;
+  final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref('locations');
+  File? _imageFile;
+  final ImagePicker _picker = ImagePicker();
+  Map<MarkerId, Marker> _markers = {}; // To store the markers from the database
+  Uint8List? fileBytes;
 
   @override
   void initState() {
     super.initState();
-    _createPolyline();
-  }
-
-  void _createPolyline() {
-    _polylines.add(Polyline(
-      polylineId: const PolylineId('marathonRoute'),
-      points: marathonRoute,
-      color: Colors.blue,
-      width: 5,
-      startCap: Cap.roundCap,
-      endCap: Cap.roundCap,
-    ));
-  }
-
-  Future<void> _loadMarkers() async {
-    final BitmapDescriptor startIcon = await BitmapDescriptor.fromAssetImage(
-      const ImageConfiguration(size: Size(90, 90)),
-      'assets/start.png',
-    );
-
-    final BitmapDescriptor finishIcon = await BitmapDescriptor.fromAssetImage(
-      const ImageConfiguration(size: Size(90, 90)),
-      'assets/finish.png',
-    );
-
-    final BitmapDescriptor runnerIcon = await BitmapDescriptor.fromAssetImage(
-      const ImageConfiguration(size: Size(32, 32)),
-      'assets/mikey.png',
-    );
-
-    setState(() {
-      _markers[const MarkerId('start')] = Marker(
-        markerId: const MarkerId('start'),
-        position: marathonRoute.first,
-        icon: startIcon,
-        infoWindow: const InfoWindow(title: 'Start Line'),
-      );
-
-      _markers[const MarkerId('finish')] = Marker(
-        markerId: const MarkerId('finish'),
-        position: marathonRoute.last,
-        icon: finishIcon,
-        infoWindow: const InfoWindow(title: 'Finish Line'),
-      );
-
-      _markers[const MarkerId('runner')] = Marker(
-        markerId: const MarkerId('runner'),
-        position: marathonRoute[1],
-        icon: runnerIcon,
-        infoWindow: const InfoWindow(title: 'runner'),
-      );
-    });
+    _loadSavedLocations(); // Load saved locations when the screen is initialized
   }
 
   @override
@@ -91,119 +40,213 @@ class _MapScreenState extends State<MapScreen> {
     super.dispose();
   }
 
+  // Load saved locations from Firebase
+  void _loadSavedLocations() {
+    _databaseRef.onValue.listen((DatabaseEvent event) {
+      final data = event.snapshot.value as Map<dynamic, dynamic>?;
+      if (data != null) {
+        setState(() {
+          _markers.clear();
+          data.forEach((key, value) {
+            final latitude = value['latitude'] as double;
+            final longitude = value['longitude'] as double;
+            final imageUrl = value['photo'] as String?;
+
+            final markerId = MarkerId(key);
+            final marker = Marker(
+              markerId: markerId,
+              position: LatLng(latitude, longitude),
+              infoWindow: InfoWindow(title: 'Saved Location'),
+              onTap: () => _showImageBottomSheet(imageUrl),
+            );
+            _markers[markerId] = marker;
+          });
+        });
+      }
+    });
+  }
+
+  // Add marker on map tap
+  void _onMapTapped(LatLng position) {
+    setState(() {
+      _selectedLocation = position;
+      _selectedMarker = Marker(
+        markerId: const MarkerId('selected_location'),
+        position: position,
+      );
+    });
+  }
+
+  void _showBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SizedBox(
+        height: 150,
+        child: Column(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take a Photo'),
+              onTap: () => _takePhoto(),
+            ),
+            ListTile(
+              leading: const Icon(Icons.save),
+              title: const Text('Save Location Without Photo'),
+              onTap: () {
+                Navigator.pop(context);
+                _saveLocationToDatabase();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _takePhoto() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.camera);
+
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
+
+      Navigator.pop(context);
+      _saveLocationToDatabase();
+    } else {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No photo taken!')),
+      );
+    }
+  }
+
+  Future<void> _saveLocationToDatabase() async {
+    if (_selectedLocation != null) {
+      String? imageUrl;
+
+      // Upload the image to Firebase Storage if a photo was taken
+      if (_imageFile != null) {
+        try {
+          // Create a reference to Firebase Storage
+          final ref = FirebaseStorage.instance
+              .ref('locations/${DateTime.now().millisecondsSinceEpoch}/image');
+
+          // Upload the image file to Firebase Storage
+          final uploadTask = await ref.putFile(_imageFile!);
+
+          // Get the download URL of the uploaded image
+          imageUrl = await uploadTask.ref.getDownloadURL();
+        } catch (e) {
+          print('Failed to upload image: $e');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to upload image!')),
+          );
+          return; // Exit the function if the image upload failed
+        }
+      }
+
+      // Save the location data (including image URL) to Firebase Realtime Database
+      final newLocationRef = _databaseRef.push();
+      await newLocationRef.set({
+        'latitude': _selectedLocation!.latitude,
+        'longitude': _selectedLocation!.longitude,
+        'photo': imageUrl, // Store the image URL or null if no photo was taken
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Location saved to database!')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a location first!')),
+      );
+    }
+  }
+
+  // Show bottom sheet with image
+  void _showImageBottomSheet(String? imageUrl) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return SizedBox(
+          height: 300,
+          child: Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Text('Image', style: TextStyle(fontSize: 18)),
+              ),
+              Expanded(
+                child: imageUrl != null
+                    ? FutureBuilder(
+                  future: _loadImage(imageUrl),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    } else if (snapshot.hasError) {
+                      return const Center(
+                        child: Text('Failed to load image!'),
+                      );
+                    } else {
+                      return Image.network(
+                        imageUrl,
+                        width: MediaQuery.of(context).size.width, // Full screen width
+                        fit: BoxFit.cover,
+                      );
+                    }
+                  },
+                )
+                    : const Center(
+                  child: Text('No image available for this location!'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _loadImage(String imageUrl) async {
+    // Simulate loading image from the network
+    await Future.delayed(const Duration(seconds: 2)); // Simulate delay for loading
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.deepPurple,
-        centerTitle: true,
-        title: Text(
-          '🏆 Marathon Prize',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: Icon(Icons.menu),
-            onPressed: () {
-              Scaffold.of(context).openDrawer();
-            },
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.share),
-            onPressed: () {
-              // Add share functionality here
-            },
-          ),
-        ],
-      ),
-        drawer: Drawer(
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              DrawerHeader(
-                decoration: BoxDecoration(
-                  color: Colors.deepPurple,
-                ),
-                child: Text(
-                  'Leaderboard',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                  ),
-                ),
-              ),
-              _buildLeaderboardEntry('John Doe', 5.4, Icons.directions_run),
-              _buildLeaderboardEntry('Jane Smith', 8.2, Icons.directions_run),
-              _buildLeaderboardEntry('Alex Brown', 12.3, Icons.directions_run),
-            ],
-          ),
-        ),
-    body: GoogleMap(
+      body: GoogleMap(
         initialCameraPosition: _initialCameraPosition,
         zoomControlsEnabled: false,
         myLocationButtonEnabled: false,
-        onMapCreated: (controller) async {
-          _googleMapController = controller;
-          await _loadMarkers();
-        },
-        markers: _markers.values.toSet(),
-        polylines: _polylines,
+        onMapCreated: (controller) => _googleMapController = controller,
+        markers: _markers.values.toSet(), // Display saved markers from Firebase
+        onTap: _onMapTapped,
       ),
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           FloatingActionButton(
             backgroundColor: Theme.of(context).primaryColor,
-            onPressed: () => _googleMapController.animateCamera(
-              CameraUpdate.newCameraPosition(_initialCameraPosition),
-            ),
+            foregroundColor: Colors.black,
+            onPressed: () {
+              _googleMapController.animateCamera(
+                CameraUpdate.newCameraPosition(_initialCameraPosition),
+              );
+            },
             child: const Icon(Icons.my_location),
           ),
           const SizedBox(height: 10),
           FloatingActionButton(
-            backgroundColor: Colors.blue,
-            onPressed: _zoomToRoute,
-            child: const Icon(Icons.zoom_out_map),
+            onPressed: _showBottomSheet,
+            child: const Icon(Icons.save),
           ),
         ],
       ),
     );
   }
-
-  void _zoomToRoute() {
-    final bounds = _calculateBounds(marathonRoute);
-    _googleMapController.animateCamera(
-      CameraUpdate.newLatLngBounds(bounds, 50),
-    );
-  }
-
-  LatLngBounds _calculateBounds(List<LatLng> points) {
-    double? minLat, maxLat, minLng, maxLng;
-    for (final point in points) {
-      minLat = (minLat == null || point.latitude < minLat) ? point.latitude : minLat;
-      maxLat = (maxLat == null || point.latitude > maxLat) ? point.latitude : maxLat;
-      minLng = (minLng == null || point.longitude < minLng) ? point.longitude : minLng;
-      maxLng = (maxLng == null || point.longitude > maxLng) ? point.longitude : maxLng;
-    }
-    return LatLngBounds(
-      southwest: LatLng(minLat!, minLng!),
-      northeast: LatLng(maxLat!, maxLng!),
-    );
-  }
 }
-Widget _buildLeaderboardEntry(String name, double kilometers, IconData icon) {
-  return ListTile(
-    leading: Icon(icon, color: Colors.deepPurple),
-    title: Text(
-      name,
-      style: TextStyle(fontWeight: FontWeight.bold),
-    ),
-    subtitle: Text('$kilometers km', style: TextStyle(color: Colors.grey)),
-    trailing: Icon(Icons.star_border, color: Colors.deepPurple), // Optional: Star icon for rankings
-    onTap: () {
-      // Add functionality if needed, for example, navigate to their profile or stats
-    },
-  );
-}
+
