@@ -210,7 +210,7 @@ class CharityRunsPage extends StatelessWidget {
                               onPressed: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (context) => ColoredAreaMap()),
+                                  MaterialPageRoute(builder: (context) => MapScreen()),
                                 );
                               },
                               style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
