@@ -89,7 +89,7 @@ class _HouseListScreenState extends State<HouseListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 65,
+        toolbarHeight: 6,
         backgroundColor: Color(0xffee0003),
         elevation: 10, // Тень для AppBar
         title: const Text(
@@ -182,123 +182,48 @@ class HouseDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Color(0xffee0003),
-        elevation: 10, // Тень для AppBar
         title: Text(
           'Детали дома',
-          style: TextStyle(
-            fontSize: 28, // Увеличенный размер шрифта
-            fontWeight: FontWeight.bold, // Жирный шрифт
-            color: Colors.white,
-          ),
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
+        elevation: 6, // Тень для AppBar
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Карточка с основными данными
-              Card(
-                elevation: 4, // Тень
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12), // Закруглённые углы
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Адрес: ${house.address}',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10),
+            Text('Дата посещения: ${house.date}', style: TextStyle(fontSize: 18)),
+            SizedBox(height: 10),
+            Text('Состав семьи: ${house.familyComposition}', style: TextStyle(fontSize: 18)),
+            SizedBox(height: 10),
+            Text('Категория граждан: ${house.category}', style: TextStyle(fontSize: 18)),
+            SizedBox(height: 10),
+            Text('Ф.И.О. инструктируемого: ${house.instructedName}', style: TextStyle(fontSize: 18)),
+            SizedBox(height: 10),
+            Text('Ф.И.О. должностного лица: ${house.instructorName}', style: TextStyle(fontSize: 18)),
+            SizedBox(height: 20),
+            Text(
+              'Требования пожарной безопасности:',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            ...house.safetyRequirements.entries.map((entry) {
+              return CheckboxListTile(
+                title: Text(
+                  entry.key,
+                  style: TextStyle(fontSize: 18),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Основная информация',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      _buildDetailRow('Адрес', house.address),
-                      _buildDetailRow('Дата посещения', house.date),
-                      _buildDetailRow('Состав семьи', house.familyComposition),
-                      _buildDetailRow('Категория граждан', house.category),
-                      _buildDetailRow('Ф.И.О. инструктируемого', house.instructedName),
-                      _buildDetailRow('Ф.И.О. должностного лица', house.instructorName),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(height: 20),
-
-              // Карточка с требованиями пожарной безопасности
-              Card(
-                elevation: 4, // Тень
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12), // Закруглённые углы
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Требования пожарной безопасности',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      ...house.safetyRequirements.entries.map((entry) {
-                        return CheckboxListTile(
-                          title: Text(
-                            entry.key,
-                            style: TextStyle(fontSize: 18),
-                          ),
-                          value: entry.value,
-                          onChanged: null, // Чекбоксы только для просмотра
-                          activeColor: Colors.green,
-                          checkColor: Colors.white,
-                        );
-                      }).toList(),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+                value: entry.value,
+                onChanged: null, // Чекбоксы только для просмотра
+              );
+            }).toList(),
+          ],
         ),
-      ),
-    );
-  }
-
-  // Вспомогательный метод для создания строки с деталями
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$label: ',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.black54,
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -12,6 +12,8 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:image_picker_web/image_picker_web.dart'; // Web-specific image picker
 import 'package:http/http.dart' as http;
 
+import 'check_bottom_sheet.dart';
+
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
 
@@ -24,11 +26,12 @@ class _MapScreenState extends State<MapScreen> {
     target: LatLng(54.86667, 69.15),
     zoom: 11.5,
   );
+  bool _isBottomSheetOpen = false;
   bool _mapInteractionEnabled = true;
   late GoogleMapController _googleMapController;
   LatLng? _selectedLocation;
   Marker? _selectedMarker;
-  final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref('locations');
+  final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref('houses');
   html.File? _imageFile;
   Uint8List? fileBytes;
   Map<MarkerId, Marker> _markers = {};
@@ -219,17 +222,19 @@ class _MapScreenState extends State<MapScreen> {
           _markers.clear();
           _circles.clear();
           data.forEach((key, value) {
-            final latitude = value['latitude'] as double;
-            final longitude = value['longitude'] as double;
-            final imageUrl = value['photo'] as String?;
-            final pollutionRating = value['pollutionRating'] as int?;
-            final tip = value['tip'] as String?;
+            final latitude = double.parse(value['latitude']);
+            final longitude = double.parse(value['longitude']);
+            final tip = value['advices'] as String?;
             final category = value['category'] as String?;
-            final address = value['address'] as String?; // Load saved address
-            final safety = value['safetyAdvice'] as String?;
+            final address = value['address'] as String?;
+            final pollutionRating = value["level"] as int;
+            final familyComposition = value["familyComposition"] as String?;
+            final date = value["date"] as String?;
+            final checker = value["instructorName"] as String?;
+            final description = value["description"] as String?;
 
-            if ((pollutionRating == null || pollutionRating <= _maxPollutionLevel) &&
-                (_selectedCategories.isEmpty || _selectedCategories.contains(category))) {
+
+            if ((_selectedCategories.isEmpty || _selectedCategories.contains(category)) && (pollutionRating>=_minPollutionLevel && pollutionRating<=_maxPollutionLevel)) {
               final markerId = MarkerId(key);
               final marker = Marker(
                 markerId: markerId,
@@ -237,14 +242,14 @@ class _MapScreenState extends State<MapScreen> {
                 infoWindow: InfoWindow(
                   title: address ?? 'Сохраненное место', // Show address as the title if available
                   onTap: () {
-                    _showImageBottomSheet(key, imageUrl, tip!, category!, address,safety); // Pass address to the bottom sheet
+                    _showImageBottomSheet(key, category!, address,tip,familyComposition,date,checker,description); // Pass address to the bottom sheet
                   },
                 ),
-                onTap: () => _showImageBottomSheet(key, imageUrl, tip!, category!, address,safety),
+                onTap: () => _showImageBottomSheet(key, category!,address,tip, familyComposition, date,checker,description),
               );
               _markers[markerId] = marker;
 
-              if (pollutionRating != null) {
+              if(pollutionRating != null) {
                 final circleId = CircleId(key);
 
                 // Create a color gradient from yellow to red (pollutionRating 1 = yellow, pollutionRating 5 = red)
@@ -282,11 +287,15 @@ class _MapScreenState extends State<MapScreen> {
 
   // Modify this method to get the address when tapping on the map
   void _onMapTapped(LatLng position) async {
+    if (_isBottomSheetOpen) {
+      return; // Не добавлять маркеры, если BottomSheet открыт
+    }
+
     setState(() {
       _selectedLocation = position;
-      _selectedAddress = "Loading address..."; // Show loading message
+      _selectedAddress = "Loading address..."; // Показываем сообщение о загрузке
 
-      // Add or update the marker with loading message
+      // Добавляем или обновляем маркер с сообщением о загрузке
       final markerId = MarkerId('selected_location');
       _selectedMarker = Marker(
         markerId: markerId,
@@ -300,13 +309,13 @@ class _MapScreenState extends State<MapScreen> {
       _markers[markerId] = _selectedMarker!;
     });
 
-    // Get the address and update the marker
+    // Получаем адрес и обновляем маркер
     final address = await getAddressFromLatLng(position);
 
     setState(() {
       _selectedAddress = address ?? "Адрес не найден";
 
-      // Update the marker with the address
+      // Обновляем маркер с адресом
       final markerId = MarkerId('selected_location');
       _selectedMarker = Marker(
         markerId: markerId,
@@ -324,450 +333,271 @@ class _MapScreenState extends State<MapScreen> {
   void _showBottomSheet() {
     final TextEditingController _descriptionController = TextEditingController();
 
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SizedBox(
-        height: 250, // Увеличиваем высоту для текстового поля
-        child: Column(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Выбрать из галереи'),
-              onTap: () => _selectImageFromGallery(),
-            ),
-            ListTile(
-              leading: const Icon(Icons.save),
-              title: const Text('Сохранить место без фотографии'),
-              onTap: () {
-                Navigator.pop(context);
-                _saveLocationToDatabase(true, _descriptionController.text);
-              },
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: TextField(
-                controller: _descriptionController,
-                decoration: InputDecoration(
-                  labelText: 'Описание пожарной безопасности',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showCommentsDialog(String locationKey) {
-    final TextEditingController _commentController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Комментарии'),
-          content: FutureBuilder(
-            future: _loadComments(locationKey),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              if (!snapshot.hasData) {
-                return const Text('Нет комментариев.');
-              }
-
-              final comments = snapshot.data as List<Map<String, dynamic>>;
-
-              return SizedBox(
-                width: double.maxFinite,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: comments.length,
-                        itemBuilder: (context, index) {
-                          final comment = comments[index];
-                          return ListTile(
-                            title: Text(comment['userName']),
-                            subtitle: Text(comment['text']),
-                          );
-                        },
-                      ),
-                    ),
-                    TextField(
-                      controller: _commentController,
-                      decoration: const InputDecoration(
-                        labelText: 'Напишите комментарий',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                final text = _commentController.text;
-                if (text.isNotEmpty && currentUser != null) {
-                  _saveComment(locationKey, text);
-                  _commentController.clear();
-                }
-              },
-              child: const Text('Отправить'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close dialog
-              },
-              child: const Text('Закрыть'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<String> getImageUrl(String imageRef) async {
-    try {
-      // Get the download URL from Firebase Storage
-      final ref = FirebaseStorage.instance.ref().child(imageRef);
-      final url = await ref.getDownloadURL();
-      return url;
-    } catch (e) {
-      throw Exception('Error retrieving image: $e');
-    }
-  }
-
-  Future<void> _selectImageFromGallery() async {
-    final pickedFile = await ImagePickerWeb.getImageAsFile(); // Web-specific method
-    if (pickedFile != null) {
-      setState(() {
-        _imageFile = pickedFile;
-      });
-      Navigator.pop(context);
-      _saveLocationToDatabase(false,"");
-    } else {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No image selected!')),
-      );
-    }
-  }
-
-  Future<Uint8List> _readFileAsBytes(html.File file) async {
-    final reader = html.FileReader();
-    final completer = Completer<Uint8List>();
-
-    reader.onLoadEnd.listen((e) {
-      completer.complete(reader.result as Uint8List);
+    setState(() {
+      _isBottomSheetOpen = true; // Устанавливаем флаг в true при открытии BottomSheet
     });
 
-    reader.readAsArrayBuffer(file);
-    return completer.future;
-  }
-
-  Future<Map<String, dynamic>> _getPollutionEvaluation(html.File imageFile) async {
-    try {
-      final bytes = await _readFileAsBytes(imageFile);
-      final base64Image = base64Encode(bytes);
-      final prompt =
-          "write only json category:(littering, e-waste, plastic, agro, water pollution) rate:(1-clean, 2-can be solved in 10 min, 3-need 1 hour, 4 - 10, 5-more than day) tip:(one paragraph 2-3 sentence)";
-      print(imageFile.name);
-      final request = http.post(
-        Uri.parse('https://api.openai.com/v1/chat/completions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer sk-2ruHUfuexrGGvI3JkS6GBXpPQacBoG7CjgINSwuUZVT3BlbkFJBl8zXKJcR-TTVQg72cf3UNDg_E_YwZLgqefgJfr1UA',
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 1,
+        minChildSize: 0.5,
+        maxChildSize: 1.0,
+        expand: false,
+        builder: (context, scrollController) {
+          return FireCheckSheet(
+            lat: _selectedLocation!.latitude.toString(),
+            lon: _selectedLocation!.longitude.toString(),
+            address: _selectedAddress ?? "",
+            scrollController: scrollController,
+          );
         },
-        body: jsonEncode({
-          "model": "gpt-4o",
-          "messages": [
-            {
-              "role": "user",
-              "content": [
-                {
-                  "type": "text",
-                  "text": prompt
-                },
-                {
-                  "type": "image_url",
-                  "image_url": {
-                    "url": "data:image/jpeg;base64,${base64Image}"
-                  }
-                }
-              ]
-            }
-          ],
-        }),
-      );
-      final response = await request;
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        var messageContent = responseData['choices'][0]['message']['content'];
-
-        // Clean and parse the content as JSON
-        messageContent = messageContent.replaceAll('```json', '').replaceAll('```', '').trim();
-        final pollutionData = jsonDecode(messageContent);
-        print('Pollution Data: $pollutionData');
-        return pollutionData; // Return the pollution data (rate, category, tip)
-      } else {
-        print('Failed to get response: ${response.statusCode}');
-        return {};
-      }
-    } catch (e) {
-      print('Error in making API call: $e');
-      return {};
-    }
-  }
-
-  String location = "";
-  String? imageUrl;
-
-  Future<void> _saveLocationToDatabase(bool nothing, String description) async {
-    if (_selectedLocation != null) {
-      Map<String, dynamic>? pollutionData;
-
-      if (_imageFile != null) {
-        final storageRef = FirebaseStorage.instance
-            .ref()
-            .child('images/${DateTime.now().millisecondsSinceEpoch}.png');
-        fileBytes = await _readFileAsBytes(_imageFile!);
-        final uploadTask = storageRef.putData(fileBytes!);
-        final snapshot = await uploadTask.whenComplete(() {});
-        imageUrl = await snapshot.ref.getDownloadURL();
-        pollutionData = await _getPollutionEvaluation(_imageFile!);
-      }
-
-      // Получаем советы от ChatGPT по описанию пожарной безопасности
-      final safetyAdvice = await _getSafetyAdviceFromChatGPT(description);
-
-      // Создаем уникальный ключ на основе широты и долготы
-      final locationKey = _encodeLocationKey(
-        _selectedLocation!.latitude,
-        _selectedLocation!.longitude,
-      );
-
-      final locationData = {
-        'latitude': _selectedLocation!.latitude,
-        'longitude': _selectedLocation!.longitude,
-        'photo': nothing ? "unknown" : imageUrl,
-        'pollutionRating': nothing ? -1 : pollutionData?['rate'] ?? -1,
-        'category': nothing ? "Unknown" : pollutionData?['category'] ?? 'unknown',
-        'tip': nothing ? "No image" : pollutionData?['tip'] ?? 'No tip provided',
-        'address': _selectedAddress,
-        'description': description, // Сохраняем описание
-        'safetyAdvice': safetyAdvice, // Сохраняем советы по безопасности
-      };
-      await _databaseRef.child(locationKey).set(locationData);
-
+      ),
+    ).whenComplete(() {
       setState(() {
-        _selectedLocation = null;
-        _imageFile = null;
-        _selectedAddress = null;
+        _isBottomSheetOpen = false; // Устанавливаем флаг в false при закрытии BottomSheet
       });
-    }
+    });
   }
-  Future<String> _getSafetyAdviceFromChatGPT(String description) async {
-    try {
-      final prompt = "Provide advices to improve fire safety if this is a description(with short adivces like 3-4 tips): $description";
-      final request = http.post(
-        Uri.parse('https://api.openai.com/v1/chat/completions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer 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',
-        },
-        body: jsonEncode({
-          "model": "gpt-4",
-          "messages": [
-            {
-              "role": "user",
-              "content": prompt
-            }
-          ],
-        }),
-      );
-      final response = await request;
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        var messageContent = responseData['choices'][0]['message']['content'];
-        return messageContent;
-      } else {
-        print('Failed to get response: ${response.statusCode}');
-        return "Не удалось получить советы по безопасности.";
-      }
-    } catch (e) {
-      print('Error in making API call: $e');
-      return "Ошибка при получении советов по безопасности.";
-    }
-  }
+  String location = "";
+
+
 
   String _encodeLocationKey(double latitude, double longitude) {
     return '${latitude.toString().replaceAll('.', '-')}_${longitude.toString().replaceAll('.', '-')}';
   }
 
-  Future<List<Map<String, dynamic>>> _loadComments(String locationKey) async {
-    final snapshot = await _databaseRef.child('$locationKey/comments').get();
-    if (snapshot.exists) {
-      final comments = snapshot.value as Map<dynamic, dynamic>;
-      return comments.values.map((comment) => Map<String, dynamic>.from(comment)).toList();
-    }
-    return [];
-  }
+  void _showImageBottomSheet(String location, String category, String? address, String? safetyAdvice, String? family, String? date, String? checker, String? description) {
+    late OverlayEntry overlayEntry;
+    bool isTipVisible = false; // Состояние видимости полного текста tip
+    String truncatedAdvice = safetyAdvice != null && safetyAdvice.length > 50 ? '${safetyAdvice.substring(0, 50)}...' : safetyAdvice ?? '';
+    String truncateddescription = description != null && description.length > 50 ? '${description.substring(0, 50)}...' : description ?? '';
 
-  void _showImageBottomSheet(String location, String? imageUrl, String tip, String category, String? address, String? safetyAdvice) {
-    if (imageUrl != null) {
-      late OverlayEntry overlayEntry;
-
-      overlayEntry = OverlayEntry(
-        builder: (context) => Positioned(
-          right: 10,
-          bottom: 10,
+    overlayEntry = OverlayEntry(
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Positioned(
+          right: 20,
+          bottom: 20,
           child: Material(
-            elevation: 8,
-            borderRadius: BorderRadius.circular(10),
+            elevation: 10,
+            borderRadius: BorderRadius.circular(15),
             child: SizedBox(
-              height: 300,
-              width: 500,
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      overlayEntry.remove();
-                      _showCommentsDialog(location);
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: imageUrl != "unknown" ? Image.network(
-                        imageUrl,
-                        fit: BoxFit.contain,
-                        height: 150,
-                        width: 150,
-                      ) : Container(),
-                    ),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 8.0, right: 8.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        crossAxisAlignment: CrossAxisAlignment.end,
+              height: 400,
+              width: 600,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (address != null)
+                      Text(
+                        'Адрес: $address',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                        textAlign: TextAlign.left,
+                      ),
+                    if (category.isNotEmpty)
+                      Text(
+                        'Категория: $category',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                        textAlign: TextAlign.left,
+                      ),
+                    if (family != null)
+                      Text(
+                        'Семья: $family',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                        textAlign: TextAlign.left,
+                      ),
+                    if (date != null)
+                      Text(
+                        'Дата: $date',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                        textAlign: TextAlign.left,
+                      ),
+                    if (checker != null)
+                      Text(
+                        'Инспектор: $checker',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                        textAlign: TextAlign.left,
+                      ),
+                    if (safetyAdvice != null)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (address != null) Text(
-                            'Адрес: $address',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          SizedBox(height: 4),
                           Text(
-                            'Tip: $tip',
+                            'Советы по безопасности: $truncatedAdvice',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                              fontSize: 18,
                             ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Category: $category',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          if (safetyAdvice != null) Text(
-                            'Советы по безопасности: $safetyAdvice',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
+                            textAlign: TextAlign.left,
                           ),
                           TextButton(
-                              onPressed: () {
-                                location = _encodeLocationKey(
-                                  _selectedLocation!.latitude,
-                                  _selectedLocation!.longitude,
-                                );
-                                _selectImageFromGallery();
-                              },
-                              child: Text("save new")
-                          )
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: Text("Советы по безопасности"),
+                                  content: SingleChildScrollView(
+                                      child: Column(
+                                        children: [
+                                          Text(
+                                            safetyAdvice,
+                                            style: TextStyle(fontSize: 18),
+                                            textAlign: TextAlign.left,
+                                          ),
+                                        ],
+                                      )
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: Text("Закрыть"),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            child: Text("Показать полностью"),
+                          ),
                         ],
                       ),
+                    if (safetyAdvice != null)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Описание от Инструктора: $truncateddescription',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                            textAlign: TextAlign.left,
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: Text("Описание от Инструктора"),
+                                  content: SingleChildScrollView(
+                                      child: Column(
+                                        children: [
+                                          Text(
+                                            description!,
+                                            style: TextStyle(fontSize: 18),
+                                            textAlign: TextAlign.left,
+                                          ),
+                                        ],
+                                      )
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: Text("Закрыть"),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            child: Text("Показать полностью"),
+                          ),
+                        ],
+                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () {
+                            location = _encodeLocationKey(
+                              _selectedLocation!.latitude,
+                              _selectedLocation!.longitude,
+                            );
+                          },
+                          child: Text("Сохранить"),
+                        ),
+                        SizedBox(width: 10),
+                        TextButton(
+                          onPressed: () {
+                            overlayEntry.remove();
+                          },
+                          child: Text("Закрыть"),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      );
+      ),
+    );
 
-      Overlay.of(context)?.insert(overlayEntry);
+    Overlay.of(context)?.insert(overlayEntry);
 
-      Future.delayed(Duration(seconds: 5)).then((value) {
-        if (overlayEntry.mounted) {
-          overlayEntry.remove();
-        }
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No image available for this location.')),
-      );
-    }
+    Future.delayed(Duration(seconds: 7)).then((value) {
+      if (overlayEntry.mounted) {
+        overlayEntry.remove();
+      }
+    });
   }
 
-  Future<void> _saveComment(String locationKey, String text) async {
-    if (currentUser != null) {
-      final userName = (await FirebaseDatabase.instance.ref('users/${currentUser!.uid}/name').get()).value as String?;
-      final commentData = {
-        'userId': currentUser!.uid,
-        'userName': userName ?? 'Anonymous',
-        'text': text,
-        'timestamp': DateTime.now().toIso8601String(),
-      };
-
-      await _databaseRef.child('$locationKey/comments').push().set(commentData);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      onDrawerChanged: (isOpened) {
+        setState(() {
+          _isBottomSheetOpen = isOpened;
+        });
+      },
       appBar: AppBar(
         backgroundColor: Color(0xffee0003),
         title: const Text('Map Screen'),
         actions: [
           TextButton(
             style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Colors.black
+              foregroundColor: Colors.white,
+              backgroundColor: Colors.black,
             ),
-            onPressed: (){},
+            onPressed: () {},
             child: Text("Map view"),
           ),
-          SizedBox(width: 10,),
+          SizedBox(width: 10),
           TextButton(
             style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Colors.black
+              foregroundColor: Colors.white,
+              backgroundColor: Colors.black,
             ),
             onPressed: () {
               if (_selectedLocation != null) {
                 _showBottomSheet(); // Add a marker with an image
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please select a location on the map.')),
+                  const SnackBar(
+                      content: Text('Please select a location on the map.')),
                 );
               }
-            }, child: Text("Add mark"),
+            },
+            child: Text("Add mark"),
           ),
-          SizedBox(width: 10,),
+          SizedBox(width: 10),
         ],
       ),
       drawer: Drawer(
@@ -804,22 +634,23 @@ class _MapScreenState extends State<MapScreen> {
             ),
           Expanded(
             child: GoogleMap(
-              gestureRecognizers: _mapInteractionEnabled
+              gestureRecognizers: _mapInteractionEnabled && !_isBottomSheetOpen
                   ? <Factory<OneSequenceGestureRecognizer>>{
-                Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()), // Enable gestures
+                Factory<OneSequenceGestureRecognizer>(
+                        () => EagerGestureRecognizer()),
               }
-                  : <Factory<OneSequenceGestureRecognizer>>{}, // Disable all gestures
+                  : <Factory<OneSequenceGestureRecognizer>>{},
               initialCameraPosition: _initialCameraPosition,
               myLocationEnabled: true,
               zoomControlsEnabled: false,
               onMapCreated: (controller) => _googleMapController = controller,
               markers: _markers.values.toSet(),
-              circles: _circles.values.toSet(),  // <-- Add this line to display circles
+              circles: _circles.values.toSet(),
               onTap: _onMapTapped,
-              scrollGesturesEnabled: _mapInteractionEnabled, // Disable scroll gestures
-              zoomGesturesEnabled: _mapInteractionEnabled,   // Disable zoom gestures
-              rotateGesturesEnabled: _mapInteractionEnabled, // Disable rotation gestures
-              tiltGesturesEnabled: _mapInteractionEnabled,
+              scrollGesturesEnabled: _mapInteractionEnabled && !_isBottomSheetOpen,
+              zoomGesturesEnabled: _mapInteractionEnabled && !_isBottomSheetOpen,
+              rotateGesturesEnabled: _mapInteractionEnabled && !_isBottomSheetOpen,
+              tiltGesturesEnabled: _mapInteractionEnabled && !_isBottomSheetOpen,
             ),
           ),
         ],
